@@ -1,7 +1,3 @@
-//
-// Created by vrin on 1/23/25.
-//
-
 #include "matrix_operations.h"
 #include <random>
 #include <fstream>
@@ -14,11 +10,9 @@ Matrix generateRandomMatrix(size_t rows, size_t cols) {
     std::mt19937 gen(rd());
     std::uniform_real_distribution<> dis(1.0, 100.0);
 
-    Matrix matrix(rows, std::vector<double>(cols));
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < cols; ++j) {
-            matrix[i][j] = dis(gen);
-        }
+    Matrix matrix(rows, cols);
+    for (size_t i = 0; i < rows * cols; ++i) {
+        matrix.data[i] = dis(gen);
     }
     return matrix;
 }
@@ -30,17 +24,9 @@ bool saveMatrixToFile(const Matrix& matrix, const std::string& filename) {
         return false;
     }
 
-    size_t rows = matrix.size();
-    size_t cols = matrix[0].size();
-
-    // Write dimensions
-    file.write(reinterpret_cast<const char*>(&rows), sizeof(rows));
-    file.write(reinterpret_cast<const char*>(&cols), sizeof(cols));
-
-    // Write data
-    for (const auto& row : matrix) {
-        file.write(reinterpret_cast<const char*>(row.data()), cols * sizeof(double));
-    }
+    file.write(reinterpret_cast<const char*>(&matrix.rows), sizeof(matrix.rows));
+    file.write(reinterpret_cast<const char*>(&matrix.cols), sizeof(matrix.cols));
+    file.write(reinterpret_cast<const char*>(matrix.data.data()), matrix.data.size() * sizeof(double));
 
     return true;
 }
@@ -60,10 +46,8 @@ bool loadMatrixFromFile(Matrix& matrix, const std::string& filename, size_t expe
         return false;
     }
 
-    matrix.resize(rows, std::vector<double>(cols));
-    for (auto& row : matrix) {
-        file.read(reinterpret_cast<char*>(row.data()), cols * sizeof(double));
-    }
+    matrix.resize(rows, cols);
+    file.read(reinterpret_cast<char*>(matrix.data.data()), matrix.data.size() * sizeof(double));
 
     return true;
 }
@@ -71,40 +55,22 @@ bool loadMatrixFromFile(Matrix& matrix, const std::string& filename, size_t expe
 void ensureMatrixFiles(size_t size, const std::string& fileA, const std::string& fileB) {
     std::cout << "Checking for matrix files of size " << size << "x" << size << "...\n";
 
-    bool generateA = true;
-    bool generateB = true;
-
-    // Try to load existing matrices
     Matrix A, B;
-    if (std::filesystem::exists(fileA)) {
-        if (loadMatrixFromFile(A, fileA, size, size)) {
-            std::cout << "Successfully loaded matrix A from " << fileA << "\n";
-            generateA = false;
-        }
-    }
+    bool generateA = !std::filesystem::exists(fileA) ||
+                    !loadMatrixFromFile(A, fileA, size, size);
+    bool generateB = !std::filesystem::exists(fileB) ||
+                    !loadMatrixFromFile(B, fileB, size, size);
 
-    if (std::filesystem::exists(fileB)) {
-        if (loadMatrixFromFile(B, fileB, size, size)) {
-            std::cout << "Successfully loaded matrix B from " << fileB << "\n";
-            generateB = false;
-        }
-    }
-
-    // Generate and save matrices if needed
     if (generateA) {
         std::cout << "Generating matrix A...\n";
         A = generateRandomMatrix(size, size);
-        if (saveMatrixToFile(A, fileA)) {
-            std::cout << "Saved matrix A to " << fileA << "\n";
-        }
+        saveMatrixToFile(A, fileA);
     }
 
     if (generateB) {
         std::cout << "Generating matrix B...\n";
         B = generateRandomMatrix(size, size);
-        if (saveMatrixToFile(B, fileB)) {
-            std::cout << "Saved matrix B to " << fileB << "\n";
-        }
+        saveMatrixToFile(B, fileB);
     }
 }
 
@@ -124,11 +90,11 @@ void logPerformance(const std::vector<PerformanceMetrics>& metrics, const std::s
 }
 
 void printMatrix(const Matrix& matrix, const std::string& name) {
-    std::cout << "\nMatrix " << name << " (" << matrix.size() << "x" << matrix[0].size() << "):\n";
-    if (matrix.size() <= 10) {  // Only print if matrix is small
-        for (const auto& row : matrix) {
-            for (double val : row) {
-                std::cout << std::setw(8) << std::fixed << std::setprecision(2) << val << " ";
+    std::cout << "\nMatrix " << name << " (" << matrix.rows << "x" << matrix.cols << "):\n";
+    if (matrix.rows <= 10) {
+        for (size_t i = 0; i < matrix.rows; ++i) {
+            for (size_t j = 0; j < matrix.cols; ++j) {
+                std::cout << std::setw(8) << std::fixed << std::setprecision(2) << matrix(i, j) << " ";
             }
             std::cout << "\n";
         }
@@ -138,15 +104,13 @@ void printMatrix(const Matrix& matrix, const std::string& name) {
 }
 
 bool compareMatrices(const Matrix& A, const Matrix& B, double tolerance) {
-    if (A.size() != B.size() || A[0].size() != B[0].size()) {
+    if (A.rows != B.rows || A.cols != B.cols) {
         return false;
     }
 
-    for (size_t i = 0; i < A.size(); ++i) {
-        for (size_t j = 0; j < A[0].size(); ++j) {
-            if (std::abs(A[i][j] - B[i][j]) > tolerance) {
-                return false;
-            }
+    for (size_t i = 0; i < A.data.size(); ++i) {
+        if (std::abs(A.data[i] - B.data[i]) > tolerance) {
+            return false;
         }
     }
     return true;

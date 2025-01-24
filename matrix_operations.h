@@ -5,7 +5,22 @@
 #include <string>
 #include <chrono>
 
-using Matrix = std::vector<std::vector<double>>;
+struct Matrix {
+    std::vector<double> data;
+    size_t rows;
+    size_t cols;
+
+    Matrix(size_t r, size_t c) : data(r * c), rows(r), cols(c) {}
+    Matrix() : rows(0), cols(0) {}
+
+    double& operator()(size_t i, size_t j) { return data[i * cols + j]; }
+    const double& operator()(size_t i, size_t j) const { return data[i * cols + j]; }
+    void resize(size_t r, size_t c) {
+        rows = r;
+        cols = c;
+        data.resize(r * c);
+    }
+};
 
 // Matrix generation and file operations
 Matrix generateRandomMatrix(size_t rows, size_t cols);
@@ -24,15 +39,12 @@ struct PerformanceMetrics {
     int matrixSize;
     int numThreads;
     std::string approach;
-    double executionTime;  // in milliseconds
+    double executionTime;
 };
 
-// Performance logging
 void logPerformance(const std::vector<PerformanceMetrics>& metrics, const std::string& filename);
 void validateResults(const Matrix& serial, const Matrix& parallel);
-
-// Helper functions
 void printMatrix(const Matrix& matrix, const std::string& name);
 bool compareMatrices(const Matrix& A, const Matrix& B, double tolerance = 1e-10);
 
-#endif // MATRIX_OPERATIONS_H
+#endif
